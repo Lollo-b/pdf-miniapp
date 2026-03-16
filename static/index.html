@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PDF Mini App</title>
+  <link rel="stylesheet" href="/static/style.css?v=prodplus1" />
+</head>
+<body>
+  <div class="container">
+    <h1>PDF Mini App</h1>
+    <p class="subtitle">Editor multi-PDF visuale pronto per il deploy.</p>
+
+    <div class="panel">
+      <h2>Editor multi-PDF</h2>
+      <div class="row">
+        <input id="pdfInput" type="file" accept="application/pdf" multiple />
+        <button id="addToQueueBtn">Aggiungi PDF</button>
+        <button id="loadEditorBtn" class="primary">Carica nell'editor</button>
+        <button id="resetBtn">Reset</button>
+        <button id="clearSelectionBtn">Deseleziona tutto</button>
+      </div>
+
+      <div id="queueWrap" class="queue-wrap muted">Nessun PDF in coda.</div>
+      <div id="passwordsWrap" class="passwords-wrap"></div>
+      <div id="stats" class="stats muted">Nessun PDF caricato nell'editor.</div>
+
+      <div class="toolbar">
+        <button id="rotate90Btn">Ruota 90°</button>
+        <button id="rotate180Btn">Ruota 180°</button>
+        <button id="clearRotationBtn">Azzera rotazione</button>
+        <button id="deleteBtn">Elimina selezione</button>
+        <button id="duplicateBtn">Duplica selezione</button>
+        <button id="blankBtn">Inserisci pagina bianca</button>
+        <select id="exportCompression">
+          <option value="none">Compressione: Nessuna</option>
+          <option value="low">Compressione: Bassa</option>
+          <option value="medium">Compressione: Media</option>
+          <option value="high">Compressione: Alta</option>
+        </select>
+        <button id="exportBtn" class="primary">Esporta PDF</button>
+      </div>
+
+      <div id="sourcesWrap" class="sources-wrap"></div>
+      <div id="selectedWrap" class="selected-wrap"></div>
+      <div id="thumbGrid" class="thumb-grid"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=prodplus1"></script>
+</body>
+</html>

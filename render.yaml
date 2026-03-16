@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: pdf-miniapp
+    env: docker
+    plan: starter
+    autoDeploy: true

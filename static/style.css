@@ -1,0 +1,28 @@
+:root { --border: rgba(120,120,120,0.18); --accent: #2e86ff; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, Arial, sans-serif; background: #fafafa; color: #111; }
+.container { max-width: 1480px; margin: 0 auto; padding: 24px; }
+h1 { margin-bottom: 6px; }
+.subtitle { color: #555; margin-top: 0; }
+.panel { background: white; border: 1px solid var(--border); border-radius: 18px; padding: 18px; margin-bottom: 18px; box-shadow: 0 4px 14px rgba(0,0,0,0.04); }
+.row, .toolbar, .passwords-wrap { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+button, input[type="file"], input[type="password"], select { font: inherit; }
+button, select, input[type="password"] { border: 1px solid var(--border); background: white; border-radius: 12px; padding: 10px 14px; }
+button { cursor: pointer; }
+button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+.stats, .muted { color: #666; }
+.selected-wrap, .sources-wrap, .queue-wrap { display: flex; flex-wrap: wrap; gap: 8px; min-height: 18px; margin-bottom: 12px; }
+.badge, .source-badge, .queue-badge { background: rgba(46,134,255,0.12); color: var(--accent); border-radius: 999px; padding: 4px 10px; font-size: 13px; }
+.source-badge { background: rgba(0,0,0,0.05); color: #333; }
+.queue-badge { background: rgba(255,164,0,0.14); color: #9a5a00; }
+.password-card { display: flex; flex-direction: column; gap: 6px; min-width: 260px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: #fafafa; }
+.password-card label { font-size: 13px; color: #444; }
+.thumb-grid { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 14px; }
+.thumb { border: 2px solid var(--border); border-radius: 16px; background: white; padding: 10px; user-select: none; cursor: grab; }
+.thumb.selected { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(46,134,255,0.15); }
+.thumb.dragging { opacity: 0.45; }
+.thumb img { width: 100%; height: auto; display: block; border-radius: 10px; background: #fff; }
+.thumb-title { display: inline-block; margin-bottom: 8px; padding: 3px 10px; border-radius: 999px; background: rgba(46,134,255,0.12); color: var(--accent); font-size: 12px; }
+.thumb-meta { margin-top: 8px; font-size: 12px; color: #666; }
+@media (max-width: 1100px) { .thumb-grid { grid-template-columns: repeat(3, minmax(140px, 1fr)); } }
+@media (max-width: 800px) { .thumb-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); } }
