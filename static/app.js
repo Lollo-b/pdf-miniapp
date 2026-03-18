@@ -3,12 +3,14 @@ let selected = new Set();
 let sources = [];
 let editorPasswords = {};
 let editorFiles = [];
+let uploadedFiles = [];
 
 const pdfInput = document.getElementById("pdfInput");
 const addToQueueBtn = document.getElementById("addToQueueBtn");
 const loadEditorBtn = document.getElementById("loadEditorBtn");
 const resetBtn = document.getElementById("resetBtn");
 const clearSelectionBtn = document.getElementById("clearSelectionBtn");
+
 const stats = document.getElementById("stats");
 const selectedWrap = document.getElementById("selectedWrap");
 const sourcesWrap = document.getElementById("sourcesWrap");
@@ -24,6 +26,11 @@ const duplicateBtn = document.getElementById("duplicateBtn");
 const blankBtn = document.getElementById("blankBtn");
 const exportBtn = document.getElementById("exportBtn");
 const exportCompression = document.getElementById("exportCompression");
+
+const directUploadBtn = document.getElementById("directUploadBtn");
+const openUploadedInEditorBtn = document.getElementById("openUploadedInEditorBtn");
+const uploadStatusWrap = document.getElementById("uploadStatusWrap");
+const uploadedFilesWrap = document.getElementById("uploadedFilesWrap");
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
@@ -86,6 +93,31 @@ function renderStats() {
   stats.textContent = `${sources.length} PDF caricati · ${items.length} pagine correnti · ${selected.size} selezionate`;
 }
 
+function renderUploadStatuses(statuses) {
+  uploadStatusWrap.innerHTML = "";
+  statuses.forEach(s => {
+    const row = document.createElement("div");
+    row.style.marginBottom = "10px";
+    row.innerHTML = `
+      <div style="font-size:13px; margin-bottom:4px;">${s.name} - ${s.progress}%</div>
+      <div style="height:10px; background:#eee; border-radius:999px; overflow:hidden;">
+        <div style="height:10px; width:${s.progress}%; background:#2e86ff;"></div>
+      </div>
+    `;
+    uploadStatusWrap.appendChild(row);
+  });
+}
+
+function renderUploadedFiles() {
+  uploadedFilesWrap.innerHTML = "";
+  uploadedFiles.forEach(f => {
+    const el = document.createElement("span");
+    el.className = "source-badge";
+    el.textContent = `${f.filename} ✓`;
+    uploadedFilesWrap.appendChild(el);
+  });
+}
+
 function makeThumb(item) {
   const div = document.createElement("div");
   div.className = "thumb" + (selected.has(item.label) ? " selected" : "");
@@ -124,7 +156,7 @@ function getDragAfterElement(container, x, y) {
 
 function renderGrid() {
   thumbGrid.innerHTML = "";
-  items.forEach(item => thumbGrid.appendChild(makeThumb(item)));
+  items.forEach(item => { thumbGrid.appendChild(makeThumb(item)); });
   thumbGrid.querySelectorAll(".thumb").forEach(el => {
     el.addEventListener("dragover", e => {
       e.preventDefault();
@@ -149,6 +181,7 @@ function render() {
   renderStats();
   renderSources();
   renderSelected();
+  renderUploadedFiles();
   renderGrid();
 }
 
@@ -164,26 +197,78 @@ function addSelectedFilesToQueue() {
   render();
 }
 
-async function loadEditorFromQueue() {
-  if (!editorFiles.length) return;
-  const fd = new FormData();
-  editorFiles.forEach(file => fd.append("files", file));
-  fd.append("passwords_json", JSON.stringify(editorPasswords));
+async function uploadSingleFileDirect(file, password, onProgress) {
+  const initRes = await fetch("/api/upload/init", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file.name, content_type: file.type || "application/pdf", size: file.size })
+  });
+  const initData = await initRes.json();
+  if (!initRes.ok) throw new Error(initData.detail || "Errore init upload");
 
-  stats.textContent = "Caricamento PDF...";
-  const res = await fetch("/api/upload", { method: "POST", body: fd });
-  const data = await res.json();
-  if (!res.ok) {
-    alert(data.detail || "Errore upload");
-    return;
+  if (initData.direct) {
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", initData.upload_url, true);
+      xhr.setRequestHeader("Content-Type", file.type || "application/pdf");
+      xhr.upload.onprogress = (evt) => {
+        if (evt.lengthComputable) onProgress(Math.round((evt.loaded / evt.total) * 100));
+      };
+      xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error(`Upload fallito: ${xhr.status}`)); };
+      xhr.onerror = () => reject(new Error("Errore di rete durante upload"));
+      xhr.send(file);
+    });
+  } else {
+    const fd = new FormData();
+    fd.append("file", file);
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", initData.upload_url, true);
+      xhr.upload.onprogress = (evt) => {
+        if (evt.lengthComputable) onProgress(Math.round((evt.loaded / evt.total) * 100));
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            initData.object_key = data.object_key;
+            resolve();
+          } catch {
+            reject(new Error("Risposta upload locale non valida"));
+          }
+        } else reject(new Error(`Upload locale fallito: ${xhr.status}`));
+      };
+      xhr.onerror = () => reject(new Error("Errore di rete durante upload locale"));
+      xhr.send(fd);
+    });
   }
+
+  const completeRes = await fetch("/api/upload/complete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file.name, object_key: initData.object_key, password: password || "" })
+  });
+  const completeData = await completeRes.json();
+  if (!completeRes.ok) throw new Error(completeData.detail || "Errore complete upload");
+  return completeData;
+}
+
+async function openUploadedInEditor() {
+  if (!uploadedFiles.length) return;
+  const res = await fetch("/api/editor/load", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tokens: uploadedFiles.map(f => f.token), passwords_json: JSON.stringify(editorPasswords) })
+  });
+  const data = await res.json();
+  if (!res.ok) { alert(data.detail || "Errore caricamento editor"); return; }
 
   sources = data.sources || [];
   items = (data.pages || []).map((p, idx) => ({
     id: uid(),
     token: p.token,
     source_index: p.source_index,
-    label: p.label || `Page ${idx+1}`,
+    label: p.label || `Page ${idx + 1}`,
     source_name: p.source_name || "",
     rotation: p.rotation || 0,
     is_blank: p.is_blank || false,
@@ -201,12 +286,39 @@ function resetAll() {
   sources = [];
   editorPasswords = {};
   editorFiles = [];
+  uploadedFiles = [];
   pdfInput.value = "";
+  uploadStatusWrap.innerHTML = "";
   render();
 }
 
 addToQueueBtn.addEventListener("click", addSelectedFilesToQueue);
-loadEditorBtn.addEventListener("click", loadEditorFromQueue);
+
+directUploadBtn.addEventListener("click", async () => {
+  if (!editorFiles.length) return;
+  const statuses = editorFiles.map(f => ({ name: f.name, progress: 0 }));
+  renderUploadStatuses(statuses);
+  uploadedFiles = [];
+  for (let i = 0; i < editorFiles.length; i++) {
+    const file = editorFiles[i];
+    try {
+      const result = await uploadSingleFileDirect(file, editorPasswords[file.name] || "", (pct) => {
+        statuses[i].progress = pct;
+        renderUploadStatuses(statuses);
+      });
+      uploadedFiles.push(result);
+      statuses[i].progress = 100;
+      renderUploadStatuses(statuses);
+      renderUploadedFiles();
+    } catch (err) {
+      alert(`${file.name}: ${err.message}`);
+      return;
+    }
+  }
+});
+
+openUploadedInEditorBtn.addEventListener("click", openUploadedInEditor);
+loadEditorBtn.addEventListener("click", openUploadedInEditor);
 resetBtn.addEventListener("click", resetAll);
 clearSelectionBtn.addEventListener("click", () => { selected = new Set(); render(); });
 
@@ -250,10 +362,7 @@ blankBtn.addEventListener("click", () => {
   items.forEach(i => {
     out.push(i);
     if (selected.has(i.label)) {
-      out.push({
-        id: uid(), token: null, source_index: null, label: `Blank ${counter++}`,
-        source_name: "", rotation: 0, is_blank: true, width: 595, height: 842, thumb: blankThumb
-      });
+      out.push({ id: uid(), token: null, source_index: null, label: `Blank ${counter++}`, source_name: "", rotation: 0, is_blank: true, width: 595, height: 842, thumb: blankThumb });
     }
   });
   items = out;
@@ -275,10 +384,7 @@ exportBtn.addEventListener("click", async () => {
     body: JSON.stringify(payload)
   });
   const data = await res.json();
-  if (!res.ok) {
-    alert(data.detail || "Errore export");
-    return;
-  }
+  if (!res.ok) { alert(data.detail || "Errore export"); return; }
   window.location.href = data.download_url;
 });
 
