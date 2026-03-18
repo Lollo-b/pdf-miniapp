@@ -2,12 +2,10 @@ let items = [];
 let selected = new Set();
 let sources = [];
 let editorPasswords = {};
-let editorFiles = [];
 let uploadedFiles = [];
+let currentFiles = [];
 
 const pdfInput = document.getElementById("pdfInput");
-const addToQueueBtn = document.getElementById("addToQueueBtn");
-const loadEditorBtn = document.getElementById("loadEditorBtn");
 const resetBtn = document.getElementById("resetBtn");
 const clearSelectionBtn = document.getElementById("clearSelectionBtn");
 
@@ -16,7 +14,6 @@ const selectedWrap = document.getElementById("selectedWrap");
 const sourcesWrap = document.getElementById("sourcesWrap");
 const thumbGrid = document.getElementById("thumbGrid");
 const passwordsWrap = document.getElementById("passwordsWrap");
-const queueWrap = document.getElementById("queueWrap");
 
 const rotate90Btn = document.getElementById("rotate90Btn");
 const rotate180Btn = document.getElementById("rotate180Btn");
@@ -27,30 +24,14 @@ const blankBtn = document.getElementById("blankBtn");
 const exportBtn = document.getElementById("exportBtn");
 const exportCompression = document.getElementById("exportCompression");
 
-const directUploadBtn = document.getElementById("directUploadBtn");
-const openUploadedInEditorBtn = document.getElementById("openUploadedInEditorBtn");
 const uploadStatusWrap = document.getElementById("uploadStatusWrap");
 const uploadedFilesWrap = document.getElementById("uploadedFilesWrap");
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
-function renderQueue() {
-  queueWrap.innerHTML = "";
-  if (!editorFiles.length) {
-    queueWrap.textContent = "Nessun PDF in coda.";
-    return;
-  }
-  editorFiles.forEach(file => {
-    const el = document.createElement("span");
-    el.className = "queue-badge";
-    el.textContent = file.name;
-    queueWrap.appendChild(el);
-  });
-}
-
 function renderPasswords() {
   passwordsWrap.innerHTML = "";
-  const names = [...new Set(editorFiles.map(f => f.name))];
+  const names = [...new Set(currentFiles.map(f => f.name))];
   names.forEach(name => {
     const card = document.createElement("div");
     card.className = "password-card";
@@ -176,25 +157,12 @@ function renderGrid() {
 }
 
 function render() {
-  renderQueue();
   renderPasswords();
   renderStats();
   renderSources();
   renderSelected();
   renderUploadedFiles();
   renderGrid();
-}
-
-function addSelectedFilesToQueue() {
-  const newFiles = [...pdfInput.files];
-  if (!newFiles.length) return;
-  const existingKeys = new Set(editorFiles.map(f => `${f.name}__${f.size}__${f.lastModified}`));
-  newFiles.forEach(f => {
-    const key = `${f.name}__${f.size}__${f.lastModified}`;
-    if (!existingKeys.has(key)) editorFiles.push(f);
-  });
-  pdfInput.value = "";
-  render();
 }
 
 async function uploadSingleFileDirect(file, password, onProgress) {
@@ -258,7 +226,10 @@ async function openUploadedInEditor() {
   const res = await fetch("/api/editor/load", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tokens: uploadedFiles.map(f => f.token), passwords_json: JSON.stringify(editorPasswords) })
+    body: JSON.stringify({
+      tokens: uploadedFiles.map(f => f.token),
+      passwords_json: JSON.stringify(editorPasswords)
+    })
   });
   const data = await res.json();
   if (!res.ok) { alert(data.detail || "Errore caricamento editor"); return; }
@@ -280,32 +251,26 @@ async function openUploadedInEditor() {
   render();
 }
 
-function resetAll() {
-  items = [];
-  selected = new Set();
-  sources = [];
-  editorPasswords = {};
-  editorFiles = [];
-  uploadedFiles = [];
-  pdfInput.value = "";
-  uploadStatusWrap.innerHTML = "";
-  render();
-}
+async function autoUploadAndOpen(files) {
+  if (!files.length) return;
+  currentFiles = files;
+  renderPasswords();
 
-addToQueueBtn.addEventListener("click", addSelectedFilesToQueue);
-
-directUploadBtn.addEventListener("click", async () => {
-  if (!editorFiles.length) return;
-  const statuses = editorFiles.map(f => ({ name: f.name, progress: 0 }));
+  const statuses = files.map(f => ({ name: f.name, progress: 0 }));
   renderUploadStatuses(statuses);
   uploadedFiles = [];
-  for (let i = 0; i < editorFiles.length; i++) {
-    const file = editorFiles[i];
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
     try {
-      const result = await uploadSingleFileDirect(file, editorPasswords[file.name] || "", (pct) => {
-        statuses[i].progress = pct;
-        renderUploadStatuses(statuses);
-      });
+      const result = await uploadSingleFileDirect(
+        file,
+        editorPasswords[file.name] || "",
+        (pct) => {
+          statuses[i].progress = pct;
+          renderUploadStatuses(statuses);
+        }
+      );
       uploadedFiles.push(result);
       statuses[i].progress = 100;
       renderUploadStatuses(statuses);
@@ -315,10 +280,27 @@ directUploadBtn.addEventListener("click", async () => {
       return;
     }
   }
+
+  await openUploadedInEditor();
+}
+
+function resetAll() {
+  items = [];
+  selected = new Set();
+  sources = [];
+  editorPasswords = {};
+  uploadedFiles = [];
+  currentFiles = [];
+  pdfInput.value = "";
+  uploadStatusWrap.innerHTML = "";
+  render();
+}
+
+pdfInput.addEventListener("change", async () => {
+  const files = [...pdfInput.files];
+  await autoUploadAndOpen(files);
 });
 
-openUploadedInEditorBtn.addEventListener("click", openUploadedInEditor);
-loadEditorBtn.addEventListener("click", openUploadedInEditor);
 resetBtn.addEventListener("click", resetAll);
 clearSelectionBtn.addEventListener("click", () => { selected = new Set(); render(); });
 

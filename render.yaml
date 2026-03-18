@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: pdf-miniapp-direct-upload-r2
+    name: pdf-miniapp-auto-open
     env: docker
     plan: starter
     autoDeploy: true

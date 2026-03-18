@@ -4,25 +4,22 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>PDF Mini App</title>
-  <link rel="stylesheet" href="/static/style.css?v=directr2" />
+  <link rel="stylesheet" href="/static/style.css?v=autopen1" />
 </head>
 <body>
   <div class="container">
     <h1>PDF Mini App</h1>
-    <p class="subtitle">Editor multi-PDF con upload diretto a storage e progress bar.</p>
+    <p class="subtitle">Seleziona i PDF: l'upload parte subito e le miniature si aprono automaticamente.</p>
 
     <div class="panel">
       <h2>Editor multi-PDF</h2>
 
       <div class="row">
         <input id="pdfInput" type="file" accept="application/pdf" multiple />
-        <button id="addToQueueBtn">Aggiungi PDF</button>
-        <button id="loadEditorBtn">Apri file caricati</button>
         <button id="resetBtn">Reset</button>
         <button id="clearSelectionBtn">Deseleziona tutto</button>
       </div>
 
-      <div id="queueWrap" class="queue-wrap muted">Nessun PDF in coda.</div>
       <div id="passwordsWrap" class="passwords-wrap"></div>
       <div id="stats" class="stats muted">Nessun PDF caricato nell'editor.</div>
 
@@ -33,8 +30,6 @@
         <button id="deleteBtn">Elimina selezione</button>
         <button id="duplicateBtn">Duplica selezione</button>
         <button id="blankBtn">Inserisci pagina bianca</button>
-        <button id="directUploadBtn">Upload diretto a storage</button>
-        <button id="openUploadedInEditorBtn" class="primary">Apri file caricati nell'editor</button>
         <select id="exportCompression">
           <option value="none">Compressione: Nessuna</option>
           <option value="low">Compressione: Bassa</option>
@@ -46,13 +41,12 @@
 
       <div id="uploadStatusWrap"></div>
       <div id="uploadedFilesWrap" class="sources-wrap"></div>
-
       <div id="sourcesWrap" class="sources-wrap"></div>
       <div id="selectedWrap" class="selected-wrap"></div>
       <div id="thumbGrid" class="thumb-grid"></div>
     </div>
   </div>
 
-  <script src="/static/app.js?v=directr2"></script>
+  <script src="/static/app.js?v=autopen1"></script>
 </body>
 </html>

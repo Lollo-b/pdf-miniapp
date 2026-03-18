@@ -140,10 +140,7 @@ def decrypt_reader_from_bytes(pdf_bytes: bytes, password: str = "") -> PdfReader
     if reader.is_encrypted:
         if not password:
             raise HTTPException(status_code=400, detail="PDF protetto da password.")
-        try:
-            result = reader.decrypt(password)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Errore durante la decodifica del PDF: {e}")
+        result = reader.decrypt(password)
         if result == 0:
             raise HTTPException(status_code=400, detail="Password PDF non corretta.")
     return reader
@@ -183,8 +180,8 @@ def upload_init(payload: UploadInitPayload):
     object_key = f"tmp/{uuid.uuid4()}_{payload.filename}"
     if USE_S3:
         upload_url = generate_presigned_put_url(object_key=object_key, content_type=payload.content_type or "application/pdf", expires_in=900)
-        return {"object_key": object_key, "upload_url": upload_url, "method": "PUT", "direct": True}
-    return {"object_key": object_key, "upload_url": "/api/upload/local", "method": "POST", "direct": False}
+        return {"object_key": object_key, "upload_url": upload_url, "direct": True}
+    return {"object_key": object_key, "upload_url": "/api/upload/local", "direct": False}
 
 @app.post("/api/upload/local")
 async def upload_local(file: UploadFile = File(...)):
@@ -218,8 +215,7 @@ def load_editor_from_uploaded(payload: LoadEditorPayload):
             raise HTTPException(status_code=404, detail=f"Upload token non trovato: {token}")
         meta = UPLOADED_OBJECTS[token]
         filename = meta["filename"]
-        object_key = meta["object_key"]
-        pdf_bytes = read_object_bytes(object_key)
+        pdf_bytes = read_object_bytes(meta["object_key"])
         password = passwords.get(filename, meta.get("password", ""))
         reader = decrypt_reader_from_bytes(pdf_bytes, password)
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
