@@ -264,3 +264,19 @@ def download_file(filename: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="File non trovato.")
     return FileResponse(str(path), media_type="application/pdf", filename=filename)
+
+@app.get("/privacy")
+def privacy():
+    return FileResponse("static/privacy.html")
+
+@app.get("/contatti")
+def contatti():
+    return FileResponse("static/contatti.html")
+
+@app.get("/about")
+def about():
+    return FileResponse("static/about.html")
+
+@app.get("/termini")
+def termini():
+    return FileResponse("static/termini.html")
