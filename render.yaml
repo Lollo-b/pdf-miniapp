@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: pdf-miniapp-auto-open
+    name: pdf-miniapp-auto-open-queue
     env: docker
     plan: starter
     autoDeploy: true

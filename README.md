@@ -1,6 +1,3 @@
-# PDF Mini App - Auto Open
+# PDF Mini App - Auto Open Queue
 
-## Cosa cambia
-- appena selezioni uno o più PDF, l'upload parte subito
-- al termine, i file vengono aperti automaticamente nell'editor
-- le miniature diventano subito visibili senza clic aggiuntivi
+Ogni nuovo PDF si aggiunge ai precedenti invece di sostituirli.

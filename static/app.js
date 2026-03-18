@@ -4,17 +4,14 @@ let sources = [];
 let editorPasswords = {};
 let uploadedFiles = [];
 let currentFiles = [];
-
 const pdfInput = document.getElementById("pdfInput");
 const resetBtn = document.getElementById("resetBtn");
 const clearSelectionBtn = document.getElementById("clearSelectionBtn");
-
 const stats = document.getElementById("stats");
 const selectedWrap = document.getElementById("selectedWrap");
 const sourcesWrap = document.getElementById("sourcesWrap");
 const thumbGrid = document.getElementById("thumbGrid");
 const passwordsWrap = document.getElementById("passwordsWrap");
-
 const rotate90Btn = document.getElementById("rotate90Btn");
 const rotate180Btn = document.getElementById("rotate180Btn");
 const clearRotationBtn = document.getElementById("clearRotationBtn");
@@ -23,351 +20,31 @@ const duplicateBtn = document.getElementById("duplicateBtn");
 const blankBtn = document.getElementById("blankBtn");
 const exportBtn = document.getElementById("exportBtn");
 const exportCompression = document.getElementById("exportCompression");
-
 const uploadStatusWrap = document.getElementById("uploadStatusWrap");
 const uploadedFilesWrap = document.getElementById("uploadedFilesWrap");
-
-function uid() { return Math.random().toString(36).slice(2, 10); }
-
-function renderPasswords() {
-  passwordsWrap.innerHTML = "";
-  const names = [...new Set(currentFiles.map(f => f.name))];
-  names.forEach(name => {
-    const card = document.createElement("div");
-    card.className = "password-card";
-    card.innerHTML = `<label>Password PDF per ${name} (lascia vuoto se non serve)</label>`;
-    const inp = document.createElement("input");
-    inp.type = "password";
-    inp.placeholder = `Password per ${name}`;
-    inp.value = editorPasswords[name] || "";
-    inp.addEventListener("input", () => { editorPasswords[name] = inp.value; });
-    card.appendChild(inp);
-    passwordsWrap.appendChild(card);
-  });
-}
-
-function renderSelected() {
-  selectedWrap.innerHTML = "";
-  [...selected].forEach(label => {
-    const el = document.createElement("span");
-    el.className = "badge";
-    el.textContent = label;
-    selectedWrap.appendChild(el);
-  });
-}
-
-function renderSources() {
-  sourcesWrap.innerHTML = "";
-  sources.forEach(src => {
-    const el = document.createElement("span");
-    el.className = "source-badge";
-    el.textContent = `${src.filename} (${src.page_count} pagine)`;
-    sourcesWrap.appendChild(el);
-  });
-}
-
-function renderStats() {
-  if (!items.length) {
-    stats.textContent = "Nessun PDF caricato nell'editor.";
-    return;
-  }
-  stats.textContent = `${sources.length} PDF caricati · ${items.length} pagine correnti · ${selected.size} selezionate`;
-}
-
-function renderUploadStatuses(statuses) {
-  uploadStatusWrap.innerHTML = "";
-  statuses.forEach(s => {
-    const row = document.createElement("div");
-    row.style.marginBottom = "10px";
-    row.innerHTML = `
-      <div style="font-size:13px; margin-bottom:4px;">${s.name} - ${s.progress}%</div>
-      <div style="height:10px; background:#eee; border-radius:999px; overflow:hidden;">
-        <div style="height:10px; width:${s.progress}%; background:#2e86ff;"></div>
-      </div>
-    `;
-    uploadStatusWrap.appendChild(row);
-  });
-}
-
-function renderUploadedFiles() {
-  uploadedFilesWrap.innerHTML = "";
-  uploadedFiles.forEach(f => {
-    const el = document.createElement("span");
-    el.className = "source-badge";
-    el.textContent = `${f.filename} ✓`;
-    uploadedFilesWrap.appendChild(el);
-  });
-}
-
-function makeThumb(item) {
-  const div = document.createElement("div");
-  div.className = "thumb" + (selected.has(item.label) ? " selected" : "");
-  div.draggable = true;
-  div.dataset.label = item.label;
-  div.innerHTML = `
-    <div class="thumb-title">${item.label}</div>
-    <img src="${item.thumb}" alt="${item.label}">
-    <div class="thumb-meta">
-      ${item.source_name ? item.source_name : ""}
-      ${item.is_blank ? " · Blank page" : ""}
-      ${item.rotation ? ` · Rot: ${item.rotation}°` : ""}
-    </div>
-  `;
-  div.addEventListener("click", () => {
-    if (selected.has(item.label)) selected.delete(item.label);
-    else selected.add(item.label);
-    render();
-  });
-  div.addEventListener("dragstart", () => div.classList.add("dragging"));
-  div.addEventListener("dragend", () => div.classList.remove("dragging"));
-  return div;
-}
-
-function getDragAfterElement(container, x, y) {
-  const elements = [...container.querySelectorAll(".thumb:not(.dragging)")];
-  return elements.reduce((closest, child) => {
-    const box = child.getBoundingClientRect();
-    const centerX = box.left + box.width / 2;
-    const centerY = box.top + box.height / 2;
-    const score = Math.abs(x - centerX) + Math.abs(y - centerY);
-    if (score < closest.score) return { score, element: child };
-    return closest;
-  }, { score: Number.POSITIVE_INFINITY, element: null }).element;
-}
-
-function renderGrid() {
-  thumbGrid.innerHTML = "";
-  items.forEach(item => { thumbGrid.appendChild(makeThumb(item)); });
-  thumbGrid.querySelectorAll(".thumb").forEach(el => {
-    el.addEventListener("dragover", e => {
-      e.preventDefault();
-      const dragging = thumbGrid.querySelector(".dragging");
-      if (!dragging) return;
-      const after = getDragAfterElement(thumbGrid, e.clientX, e.clientY);
-      if (after == null) thumbGrid.appendChild(dragging);
-      else if (after !== dragging) thumbGrid.insertBefore(dragging, after);
-    });
-  });
-  thumbGrid.addEventListener("drop", () => {
-    const order = [...thumbGrid.querySelectorAll(".thumb")].map(el => el.dataset.label);
-    const lookup = new Map(items.map(i => [i.label, i]));
-    items = order.map(label => lookup.get(label)).filter(Boolean);
-    render();
-  }, { once: true });
-}
-
-function render() {
-  renderPasswords();
-  renderStats();
-  renderSources();
-  renderSelected();
-  renderUploadedFiles();
-  renderGrid();
-}
-
-async function uploadSingleFileDirect(file, password, onProgress) {
-  const initRes = await fetch("/api/upload/init", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename: file.name, content_type: file.type || "application/pdf", size: file.size })
-  });
-  const initData = await initRes.json();
-  if (!initRes.ok) throw new Error(initData.detail || "Errore init upload");
-
-  if (initData.direct) {
-    await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", initData.upload_url, true);
-      xhr.setRequestHeader("Content-Type", file.type || "application/pdf");
-      xhr.upload.onprogress = (evt) => {
-        if (evt.lengthComputable) onProgress(Math.round((evt.loaded / evt.total) * 100));
-      };
-      xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error(`Upload fallito: ${xhr.status}`)); };
-      xhr.onerror = () => reject(new Error("Errore di rete durante upload"));
-      xhr.send(file);
-    });
-  } else {
-    const fd = new FormData();
-    fd.append("file", file);
-    await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", initData.upload_url, true);
-      xhr.upload.onprogress = (evt) => {
-        if (evt.lengthComputable) onProgress(Math.round((evt.loaded / evt.total) * 100));
-      };
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            initData.object_key = data.object_key;
-            resolve();
-          } catch {
-            reject(new Error("Risposta upload locale non valida"));
-          }
-        } else reject(new Error(`Upload locale fallito: ${xhr.status}`));
-      };
-      xhr.onerror = () => reject(new Error("Errore di rete durante upload locale"));
-      xhr.send(fd);
-    });
-  }
-
-  const completeRes = await fetch("/api/upload/complete", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename: file.name, object_key: initData.object_key, password: password || "" })
-  });
-  const completeData = await completeRes.json();
-  if (!completeRes.ok) throw new Error(completeData.detail || "Errore complete upload");
-  return completeData;
-}
-
-async function openUploadedInEditor() {
-  if (!uploadedFiles.length) return;
-  const res = await fetch("/api/editor/load", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      tokens: uploadedFiles.map(f => f.token),
-      passwords_json: JSON.stringify(editorPasswords)
-    })
-  });
-  const data = await res.json();
-  if (!res.ok) { alert(data.detail || "Errore caricamento editor"); return; }
-
-  sources = data.sources || [];
-  items = (data.pages || []).map((p, idx) => ({
-    id: uid(),
-    token: p.token,
-    source_index: p.source_index,
-    label: p.label || `Page ${idx + 1}`,
-    source_name: p.source_name || "",
-    rotation: p.rotation || 0,
-    is_blank: p.is_blank || false,
-    width: p.width || 595,
-    height: p.height || 842,
-    thumb: p.thumb
-  }));
-  selected = new Set();
-  render();
-}
-
-async function autoUploadAndOpen(files) {
-  if (!files.length) return;
-  currentFiles = files;
-  renderPasswords();
-
-  const statuses = files.map(f => ({ name: f.name, progress: 0 }));
-  renderUploadStatuses(statuses);
-  uploadedFiles = [];
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    try {
-      const result = await uploadSingleFileDirect(
-        file,
-        editorPasswords[file.name] || "",
-        (pct) => {
-          statuses[i].progress = pct;
-          renderUploadStatuses(statuses);
-        }
-      );
-      uploadedFiles.push(result);
-      statuses[i].progress = 100;
-      renderUploadStatuses(statuses);
-      renderUploadedFiles();
-    } catch (err) {
-      alert(`${file.name}: ${err.message}`);
-      return;
-    }
-  }
-
-  await openUploadedInEditor();
-}
-
-function resetAll() {
-  items = [];
-  selected = new Set();
-  sources = [];
-  editorPasswords = {};
-  uploadedFiles = [];
-  currentFiles = [];
-  pdfInput.value = "";
-  uploadStatusWrap.innerHTML = "";
-  render();
-}
-
-pdfInput.addEventListener("change", async () => {
-  const files = [...pdfInput.files];
-  await autoUploadAndOpen(files);
-});
-
-resetBtn.addEventListener("click", resetAll);
-clearSelectionBtn.addEventListener("click", () => { selected = new Set(); render(); });
-
-rotate90Btn.addEventListener("click", () => {
-  items.forEach(i => { if (selected.has(i.label)) i.rotation = (i.rotation + 90) % 360; });
-  render();
-});
-rotate180Btn.addEventListener("click", () => {
-  items.forEach(i => { if (selected.has(i.label)) i.rotation = (i.rotation + 180) % 360; });
-  render();
-});
-clearRotationBtn.addEventListener("click", () => {
-  items.forEach(i => { if (selected.has(i.label)) i.rotation = 0; });
-  render();
-});
-deleteBtn.addEventListener("click", () => {
-  items = items.filter(i => !selected.has(i.label));
-  selected = new Set();
-  render();
-});
-duplicateBtn.addEventListener("click", () => {
-  let counter = 1;
-  const out = [];
-  items.forEach(i => {
-    out.push(i);
-    if (selected.has(i.label)) out.push({ ...i, id: uid(), label: `${i.label} copy ${counter++}` });
-  });
-  items = out;
-  render();
-});
-blankBtn.addEventListener("click", () => {
-  if (selected.size === 0) return;
-  let counter = 1;
-  const blankThumb = "data:image/svg+xml;base64," + btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="595" height="842">
-      <rect width="100%" height="100%" fill="white" stroke="#ddd"/>
-      <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#999" font-size="28">Blank page</text>
-    </svg>
-  `);
-  const out = [];
-  items.forEach(i => {
-    out.push(i);
-    if (selected.has(i.label)) {
-      out.push({ id: uid(), token: null, source_index: null, label: `Blank ${counter++}`, source_name: "", rotation: 0, is_blank: true, width: 595, height: 842, thumb: blankThumb });
-    }
-  });
-  items = out;
-  render();
-});
-
-exportBtn.addEventListener("click", async () => {
-  if (!items.length) return;
-  const payload = {
-    compression: exportCompression.value,
-    items: items.map(i => ({
-      token: i.token, source_index: i.source_index, rotation: i.rotation, is_blank: i.is_blank,
-      width: i.width, height: i.height, label: i.label, source_name: i.source_name
-    }))
-  };
-  const res = await fetch("/api/export", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  const data = await res.json();
-  if (!res.ok) { alert(data.detail || "Errore export"); return; }
-  window.location.href = data.download_url;
-});
-
-render();
+function uid(){return Math.random().toString(36).slice(2,10)}
+function renderPasswords(){passwordsWrap.innerHTML="";const names=[...new Set(currentFiles.map(f=>f.name))];names.forEach(name=>{const card=document.createElement("div");card.className="password-card";card.innerHTML=`<label>Password PDF per ${name} (lascia vuoto se non serve)</label>`;const inp=document.createElement("input");inp.type="password";inp.placeholder=`Password per ${name}`;inp.value=editorPasswords[name]||"";inp.addEventListener("input",()=>{editorPasswords[name]=inp.value});card.appendChild(inp);passwordsWrap.appendChild(card)})}
+function renderSelected(){selectedWrap.innerHTML="";[...selected].forEach(label=>{const el=document.createElement("span");el.className="badge";el.textContent=label;selectedWrap.appendChild(el)})}
+function renderSources(){sourcesWrap.innerHTML="";sources.forEach(src=>{const el=document.createElement("span");el.className="source-badge";el.textContent=`${src.filename} (${src.page_count} pagine)`;sourcesWrap.appendChild(el)})}
+function renderStats(){stats.textContent=!items.length?"Nessun PDF caricato nell'editor.":`${sources.length} PDF caricati · ${items.length} pagine correnti · ${selected.size} selezionate`}
+function renderUploadStatuses(statuses){uploadStatusWrap.innerHTML="";statuses.forEach(s=>{const row=document.createElement("div");row.style.marginBottom="10px";row.innerHTML=`<div style="font-size:13px; margin-bottom:4px;">${s.name} - ${s.progress}%</div><div style="height:10px; background:#eee; border-radius:999px; overflow:hidden;"><div style="height:10px; width:${s.progress}%; background:#2e86ff;"></div></div>`;uploadStatusWrap.appendChild(row)})}
+function renderUploadedFiles(){uploadedFilesWrap.innerHTML="";uploadedFiles.forEach(f=>{const el=document.createElement("span");el.className="source-badge";el.textContent=`${f.filename} ✓`;uploadedFilesWrap.appendChild(el)})}
+function makeThumb(item){const div=document.createElement("div");div.className="thumb"+(selected.has(item.label)?" selected":"");div.draggable=true;div.dataset.label=item.label;div.innerHTML=`<div class="thumb-title">${item.label}</div><img src="${item.thumb}" alt="${item.label}"><div class="thumb-meta">${item.source_name?item.source_name:""}${item.is_blank?" · Blank page":""}${item.rotation?` · Rot: ${item.rotation}°`:""}</div>`;div.addEventListener("click",()=>{if(selected.has(item.label))selected.delete(item.label);else selected.add(item.label);render()});div.addEventListener("dragstart",()=>div.classList.add("dragging"));div.addEventListener("dragend",()=>div.classList.remove("dragging"));return div}
+function getDragAfterElement(container,x,y){const elements=[...container.querySelectorAll(".thumb:not(.dragging)")];return elements.reduce((closest,child)=>{const box=child.getBoundingClientRect();const centerX=box.left+box.width/2;const centerY=box.top+box.height/2;const score=Math.abs(x-centerX)+Math.abs(y-centerY);if(score<closest.score)return{score,element:child};return closest},{score:Number.POSITIVE_INFINITY,element:null}).element}
+function renderGrid(){thumbGrid.innerHTML="";items.forEach(item=>thumbGrid.appendChild(makeThumb(item)));thumbGrid.querySelectorAll(".thumb").forEach(el=>{el.addEventListener("dragover",e=>{e.preventDefault();const dragging=thumbGrid.querySelector(".dragging");if(!dragging)return;const after=getDragAfterElement(thumbGrid,e.clientX,e.clientY);if(after==null)thumbGrid.appendChild(dragging);else if(after!==dragging)thumbGrid.insertBefore(dragging,after)})});thumbGrid.addEventListener("drop",()=>{const order=[...thumbGrid.querySelectorAll(".thumb")].map(el=>el.dataset.label);const lookup=new Map(items.map(i=>[i.label,i]));items=order.map(label=>lookup.get(label)).filter(Boolean);render()},{once:true})}
+function render(){renderPasswords();renderStats();renderSources();renderSelected();renderUploadedFiles();renderGrid()}
+async function uploadSingleFileDirect(file,password,onProgress){const initRes=await fetch("/api/upload/init",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:file.name,content_type:file.type||"application/pdf",size:file.size})});const initData=await initRes.json();if(!initRes.ok)throw new Error(initData.detail||"Errore init upload");if(initData.direct){await new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest();xhr.open("PUT",initData.upload_url,true);xhr.setRequestHeader("Content-Type",file.type||"application/pdf");xhr.upload.onprogress=evt=>{if(evt.lengthComputable)onProgress(Math.round((evt.loaded/evt.total)*100))};xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300)resolve();else reject(new Error(`Upload fallito: ${xhr.status}`))};xhr.onerror=()=>reject(new Error("Errore di rete durante upload"));xhr.send(file)})}else{const fd=new FormData();fd.append("file",file);await new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest();xhr.open("POST",initData.upload_url,true);xhr.upload.onprogress=evt=>{if(evt.lengthComputable)onProgress(Math.round((evt.loaded/evt.total)*100))};xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300){try{const data=JSON.parse(xhr.responseText);initData.object_key=data.object_key;resolve()}catch{reject(new Error("Risposta upload locale non valida"))}}else reject(new Error(`Upload locale fallito: ${xhr.status}`))};xhr.onerror=()=>reject(new Error("Errore di rete durante upload locale"));xhr.send(fd)})}const completeRes=await fetch("/api/upload/complete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:file.name,object_key:initData.object_key,password:password||""})});const completeData=await completeRes.json();if(!completeRes.ok)throw new Error(completeData.detail||"Errore complete upload");return completeData}
+async function rebuildEditorFromQueue(){if(!uploadedFiles.length)return;const res=await fetch("/api/editor/load",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tokens:uploadedFiles.map(f=>f.token),passwords_json:JSON.stringify(editorPasswords)})});const data=await res.json();if(!res.ok){alert(data.detail||"Errore caricamento editor");return}sources=data.sources||[];items=(data.pages||[]).map((p,idx)=>({id:uid(),token:p.token,source_index:p.source_index,label:p.label||`Page ${idx+1}`,source_name:p.source_name||"",rotation:p.rotation||0,is_blank:p.is_blank||false,width:p.width||595,height:p.height||842,thumb:p.thumb}));selected=new Set();render()}
+async function addFilesToQueue(files){if(!files.length)return;currentFiles=[...currentFiles,...files];renderPasswords();const statuses=files.map(f=>({name:f.name,progress:0}));renderUploadStatuses(statuses);for(let i=0;i<files.length;i++){const file=files[i];const result=await uploadSingleFileDirect(file,editorPasswords[file.name]||"",pct=>{statuses[i].progress=pct;renderUploadStatuses(statuses)});uploadedFiles.push(result);statuses[i].progress=100;renderUploadStatuses(statuses);renderUploadedFiles()}await rebuildEditorFromQueue()}
+function resetAll(){items=[];selected=new Set();sources=[];editorPasswords={};uploadedFiles=[];currentFiles=[];pdfInput.value="";uploadStatusWrap.innerHTML="";render()}
+pdfInput.addEventListener("change",async()=>{const files=[...pdfInput.files];pdfInput.value="";try{await addFilesToQueue(files)}catch(err){alert(err.message)}})
+resetBtn.addEventListener("click",resetAll)
+clearSelectionBtn.addEventListener("click",()=>{selected=new Set();render()})
+rotate90Btn.addEventListener("click",()=>{items.forEach(i=>{if(selected.has(i.label))i.rotation=(i.rotation+90)%360});render()})
+rotate180Btn.addEventListener("click",()=>{items.forEach(i=>{if(selected.has(i.label))i.rotation=(i.rotation+180)%360});render()})
+clearRotationBtn.addEventListener("click",()=>{items.forEach(i=>{if(selected.has(i.label))i.rotation=0});render()})
+deleteBtn.addEventListener("click",()=>{items=items.filter(i=>!selected.has(i.label));selected=new Set();render()})
+duplicateBtn.addEventListener("click",()=>{let counter=1;const out=[];items.forEach(i=>{out.push(i);if(selected.has(i.label))out.push({...i,id:uid(),label:`${i.label} copy ${counter++}`})});items=out;render()})
+blankBtn.addEventListener("click",()=>{if(selected.size===0)return;let counter=1;const blankThumb="data:image/svg+xml;base64,"+btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="595" height="842"><rect width="100%" height="100%" fill="white" stroke="#ddd"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#999" font-size="28">Blank page</text></svg>`);const out=[];items.forEach(i=>{out.push(i);if(selected.has(i.label))out.push({id:uid(),token:null,source_index:null,label:`Blank ${counter++}`,source_name:"",rotation:0,is_blank:true,width:595,height:842,thumb:blankThumb})});items=out;render()})
+exportBtn.addEventListener("click",async()=>{if(!items.length)return;const payload={compression:exportCompression.value,items:items.map(i=>({token:i.token,source_index:i.source_index,rotation:i.rotation,is_blank:i.is_blank,width:i.width,height:i.height,label:i.label,source_name:i.source_name}))};const res=await fetch("/api/export",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});const data=await res.json();if(!res.ok){alert(data.detail||"Errore export");return}window.location.href=data.download_url})
+render()

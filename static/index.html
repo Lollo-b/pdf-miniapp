@@ -4,25 +4,21 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>PDF Mini App</title>
-  <link rel="stylesheet" href="/static/style.css?v=autopen1" />
+  <link rel="stylesheet" href="/static/style.css?v=autopenq2" />
 </head>
 <body>
   <div class="container">
     <h1>PDF Mini App</h1>
-    <p class="subtitle">Seleziona i PDF: l'upload parte subito e le miniature si aprono automaticamente.</p>
-
+    <p class="subtitle">Ogni PDF caricato si aggiunge in coda ai precedenti e le miniature si aggiornano subito.</p>
     <div class="panel">
       <h2>Editor multi-PDF</h2>
-
       <div class="row">
         <input id="pdfInput" type="file" accept="application/pdf" multiple />
         <button id="resetBtn">Reset</button>
         <button id="clearSelectionBtn">Deseleziona tutto</button>
       </div>
-
       <div id="passwordsWrap" class="passwords-wrap"></div>
       <div id="stats" class="stats muted">Nessun PDF caricato nell'editor.</div>
-
       <div class="toolbar">
         <button id="rotate90Btn">Ruota 90°</button>
         <button id="rotate180Btn">Ruota 180°</button>
@@ -38,7 +34,6 @@
         </select>
         <button id="exportBtn" class="primary">Esporta PDF</button>
       </div>
-
       <div id="uploadStatusWrap"></div>
       <div id="uploadedFilesWrap" class="sources-wrap"></div>
       <div id="sourcesWrap" class="sources-wrap"></div>
@@ -46,7 +41,6 @@
       <div id="thumbGrid" class="thumb-grid"></div>
     </div>
   </div>
-
-  <script src="/static/app.js?v=autopen1"></script>
+  <script src="/static/app.js?v=autopenq2"></script>
 </body>
 </html>
